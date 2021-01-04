@@ -22,3 +22,9 @@ Convert a class based react component to functional component.
 - wrap functions with `useCallback()`, maybe handle dependency array
 - separate state object by keys
 - clear unnecessary clean function in `useEffect()`
+
+## Supported flags:
+
+| flag name      | description                                                                                                       |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| --spread-state | the generated functional component will use separate `useState()` calls according to the keys of the state object |
