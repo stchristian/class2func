@@ -2,6 +2,14 @@
 
 Convert a class based react component to functional component.
 
+## Usage
+
+```
+> class2func ./SomeReactComponent.js
+```
+
+Result is written to _./SomeReactComponent.functional.js_
+
 ## It can handle
 
 - PureComponents gets wrapped React.memo()
