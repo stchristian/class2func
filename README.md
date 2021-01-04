@@ -1,6 +1,6 @@
 # Class2hook
 
-Convert a class based react component to functional component
+Convert a class based react component to functional component.
 
 ## It can handle
 

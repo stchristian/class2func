@@ -8,11 +8,11 @@ import {
   createVariableStatement,
   wrapInMemo,
   createUseEffect,
+  capitalize,
 } from "./builders";
 import {
   doesNameMatchWith,
   getSuperClass,
-  isClassExtendsReactComponent,
   hasDefaultExport,
   isInitialPropsFunction,
   isMethodBindingStatement,
@@ -28,6 +28,7 @@ function printJson(params: any) {
 const printer = ts.createPrinter();
 
 const tFactory: ts.TransformerFactory<ts.Node> = (context: ts.TransformationContext) => {
+  const compilerOptions = context.getCompilerOptions();
   return (rootNode) => {
     let ctx = {
       componentName: "",
@@ -37,7 +38,7 @@ const tFactory: ts.TransformerFactory<ts.Node> = (context: ts.TransformationCont
       componentDidUpdate: undefined as ts.Statement[] | undefined,
     };
 
-    function visitCtorStatement(statement: ts.Statement): ts.Statement {
+    function visitCtorStatement(statement: ts.Statement): ts.Statement | ts.Statement[] {
       if (
         ts.isExpressionStatement(statement) &&
         ts.isBinaryExpression(statement.expression) &&
@@ -45,14 +46,16 @@ const tFactory: ts.TransformerFactory<ts.Node> = (context: ts.TransformationCont
         statement.expression.left.expression.kind === ts.SyntaxKind.ThisKeyword &&
         statement.expression.left.name.escapedText === "state"
       ) {
-        // if (ts.isObjectLiteralExpression(exp.right)) {
-        //   printJson(exp.right);
-        //   return exp.right.properties.map((prop) => {
-        //     if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
-        //       return createUseStateStatement(prop.initializer, prop.name.escapedText as string);
-        //     }
-        //   });
-        return createUseStateStatement(statement.expression.right);
+        if (compilerOptions.spreadState && ts.isObjectLiteralExpression(statement.expression.right)) {
+          return statement.expression.right.properties.reduce((res, prop) => {
+            if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+              res.push(createUseStateStatement(prop.initializer, prop.name.escapedText as string));
+            }
+            return res;
+          }, [] as ts.Statement[]);
+        } else {
+          return createUseStateStatement(statement.expression.right);
+        }
       }
       return statement;
     }
@@ -67,10 +70,55 @@ const tFactory: ts.TransformerFactory<ts.Node> = (context: ts.TransformationCont
 
       return ctor.body.statements
         .filter((st) => !(isSuperCtorCall(st) || isMethodBindingStatement(st)))
-        .map(visitCtorStatement);
+        .reduce((res, oldStatement) => {
+          const newStatement = visitCtorStatement(oldStatement);
+          if (Array.isArray(newStatement)) {
+            res.push(...newStatement);
+          } else {
+            res.push(newStatement);
+          }
+          return res;
+        }, [] as ts.Statement[]);
     }
 
-    function visitNode(node: ts.Node): ts.Node {
+    function visitNode(node: ts.Node): ts.Node | ts.Node[] {
+      // this.setState({ example: "Hello world"})
+      if (
+        compilerOptions.spreadState &&
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.name) &&
+        node.expression.name.escapedText === "setState" &&
+        node.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+        ts.isObjectLiteralExpression(node.arguments[0])
+      ) {
+        const object = node.arguments[0] as ts.ObjectLiteralExpression;
+        // TODO: we should check if setXYZ exists
+        return object.properties.reduce((res, prop) => {
+          if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.name)) {
+            res.push(
+              ts.factory.createCallExpression(
+                ts.factory.createIdentifier(`set${capitalize(prop.name.escapedText)}`),
+                undefined,
+                [ts.visitEachChild(prop.initializer, visitNode, context)]
+              )
+            );
+          }
+          return res;
+        }, [] as ts.Node[]);
+      }
+      // this.state.hello => hello
+      if (
+        compilerOptions.spreadState &&
+        ts.isPropertyAccessExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+        ts.isIdentifier(node.expression.name) &&
+        node.expression.name.escapedText === "state"
+      ) {
+        return node.name;
+      }
+
       if (ts.isPropertyAccessExpression(node) && node.expression.kind === ts.SyntaxKind.ThisKeyword) {
         return node.name;
       }
@@ -100,7 +148,9 @@ const tFactory: ts.TransformerFactory<ts.Node> = (context: ts.TransformationCont
           createMethodProperty(
             ctx.componentName,
             "getInitialProps",
-            createArrowFunction([...method.parameters], method.body, [...(method.modifiers ? method.modifiers : [])])
+            createArrowFunction([...method.parameters], method.body, [
+              ...(method.modifiers ? method.modifiers.filter((m) => m.kind !== ts.SyntaxKind.StaticKeyword) : []),
+            ])
           )
         );
         return [];
@@ -277,9 +327,15 @@ const tFactory: ts.TransformerFactory<ts.Node> = (context: ts.TransformationCont
   };
 };
 
-export function transform(fileName: string, text: string) {
+export function transform(
+  fileName: string,
+  text: string,
+  options: {
+    spreadState?: boolean;
+  }
+) {
   const tsSourceFile = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest);
-  const transResult = ts.transform(tsSourceFile, [tFactory]);
+  const transResult = ts.transform(tsSourceFile, [tFactory], options);
   //@ts-ignore
   const result = printer.printNode(ts.EmitHint.Unspecified, transResult.transformed[0], tsSourceFile);
   return result;

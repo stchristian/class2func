@@ -1,16 +1,17 @@
 {
-  "name": "class2hook",
+  "name": "class2func",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "./dist/cli.js",
+  "bin": "./dist/cli.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only ./src/index.ts",
     "dev:debug": "ts-node-dev --inspect-brk=4321 --respawn --transpile-only ./src/index.ts",
-    "dev:test": "ts-node-dev --respawn --transpile-only ./src/cli.ts -- ./example.js",
+    "dev:example": "ts-node-dev --respawn --transpile-only ./src/cli.ts -- ./example.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc"
   },
-  "author": "",
+  "author": "Hübner Krisztián",
   "license": "ISC",
   "dependencies": {
     "@types/node": "^14.14.14",

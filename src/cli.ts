@@ -7,8 +7,9 @@ import path from "path";
 import { transform } from "./transformer";
 
 yargs(hideBin(process.argv))
+  .scriptName("class2func")
   .command(
-    "$0 <files...>",
+    "$0 [options] <files...>",
     "Transpile javascript files containing class based components",
     (yargs) =>
       yargs
@@ -17,21 +18,34 @@ yargs(hideBin(process.argv))
           array: true,
           type: "string",
         })
-        .demandOption("files"),
+        .demandOption("files")
+        .boolean("spread-state")
+        .describe(
+          "spread-state",
+          "use spread state if your state is an object and you want to use different useState() calls to the keys of that object"
+        ),
     (argv) => {
-      transformFiles(argv.files);
+      console.log(argv);
+      transformFiles(argv.files, {
+        spreadState: argv["spread-state"],
+      });
     }
   )
   .help().argv;
 
-function transformFiles(files: string[]) {
+function transformFiles(
+  files: string[],
+  options: {
+    spreadState?: boolean;
+  }
+) {
   for (const file of files) {
     fs.readFile(file, "utf8", (err, sourceText) => {
       if (err) {
         console.error(err);
         return;
       }
-      const result = transform(path.basename(file), sourceText);
+      const result = transform(path.basename(file), sourceText, options);
       const pathToWrite = path.join(path.dirname(file), `${path.basename(file, ".js")}.functional.js`);
       fs.writeFile(pathToWrite, result, () => {
         console.log(`${file} compiled`);
