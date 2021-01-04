@@ -1,0 +1,25 @@
+{
+  "name": "class2hook",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only ./src/index.ts",
+    "dev:debug": "ts-node-dev --inspect-brk=4321 --respawn --transpile-only ./src/index.ts",
+    "dev:test": "ts-node-dev --respawn --transpile-only ./src/cli.ts -- ./example.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^14.14.14",
+    "@wessberg/ts-clone-node": "^0.3.18",
+    "typescript": "^4.1.3",
+    "yargs": "^16.2.0"
+  },
+  "devDependencies": {
+    "@types/yargs": "^15.0.12",
+    "ts-node-dev": "^1.1.1"
+  }
+}
